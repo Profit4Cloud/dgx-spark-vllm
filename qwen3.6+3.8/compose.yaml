@@ -1,0 +1,196 @@
+x-logging: &common-logging
+  driver: local
+  options:
+    max-size: "20m"
+    max-file: "3"
+
+services:
+  qwen3.6-35b-a3b:
+    image: vllm/vllm-openai:v0.32.0
+    logging: *common-logging
+    container_name: qwen3.6-35b-a3b
+    entrypoint:
+      - vllm
+      - serve
+    command:
+      - nvidia/Qwen3.6-35B-A3B-NVFP4
+      - --port
+      - "8001"
+      - --trust-remote-code
+      - --kv-cache-dtype
+      - fp8
+      - --attention-backend
+      - flashinfer
+      - --moe-backend
+      - marlin
+      - --gpu-memory-utilization
+      - '0.25'
+      - --max-model-len
+      - '32768'
+      - --max-num-seqs
+      - '4'
+      - --max-num-batched-tokens
+      - '8192'
+      - --enable-chunked-prefill
+      - --async-scheduling
+      - --enable-prefix-caching
+      - --load-format
+      - fastsafetensors
+      - --tensor-parallel-size
+      - '1'
+      - --enable-auto-tool-choice
+      - --tool-call-parser
+      - qwen3_coder
+      - --reasoning-parser
+      - qwen3
+      - --speculative-config
+      - '{"method":"mtp","num_speculative_tokens":3,"moe_backend":"triton"}'
+      - --language-model-only
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=5)"
+      interval: 10s
+      timeout: 6s
+      retries: 30
+      start_period: 300s
+    ports:
+      - "127.0.0.1:8001:8001"
+    restart: unless-stopped
+    environment: &common-env
+      HF_HOME: /root/.cache/huggingface
+      HF_HUB_CACHE: /root/.cache/huggingface
+      HF_HUB_OFFLINE: '1'
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      VLLM_NO_USAGE_STATS: '1'
+      DO_NOT_TRACK:   '1'
+      RAY_USAGE_STATS_ENABLED: '0'
+      PYTHONUNBUFFERED: '1'
+      VLLM_CACHE_ROOT: /root/.cache/vllm
+      VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR: /root/.cache/flashinfer/autotune
+    volumes: &common-volumes
+      - ${HOME}/.cache/huggingface/hub:/root/.cache/huggingface
+      - ${HOME}/.cache/vllm:/root/.cache/vllm
+      - ${HOME}/.cache/flashinfer/autotune:/root/.cache/flashinfer/autotune
+    ipc: host
+    gpus: all
+
+  qwen3.8-27b:
+    image: vllm/vllm-openai:v0.32.0
+    logging: *common-logging
+    container_name: qwen3.8-27b
+    entrypoint:
+      - vllm
+      - serve
+    command:
+      - nvidia/Qwen3.8-27B-NVFP4
+      - --kv-cache-dtype
+      - fp8
+      - --gpu-memory-utilization
+      - '0.55'
+      - --max-model-len
+      - '131072'
+      - --max-num-seqs
+      - '2'
+      - --max-num-batched-tokens
+      - '8192'
+      - --enable-chunked-prefill
+      - --async-scheduling
+      - --enable-prefix-caching
+      - --load-format
+      - fastsafetensors
+      - --tensor-parallel-size
+      - '1'
+      - --enable-auto-tool-choice
+      - --tool-call-parser
+      - qwen3_coder
+      - --reasoning-parser
+      - qwen3
+      - --speculative-config
+      - '{"method":"mtp","num_speculative_tokens":4}'
+      - --language-model-only
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+    depends_on:
+      qwen3.6-35b-a3b:
+        condition: service_healthy
+    environment: *common-env
+    volumes: *common-volumes
+    ipc: host
+    gpus: all
+  prometheus:
+    image: prom/prometheus:v3.7.1
+    logging: *common-logging
+    container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.2.0
+    logging: *common-logging
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  dcgm-exporter:
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.6.1-4.8.4-distroless
+    logging: *common-logging
+    container_name: dcgm-exporter
+    restart: unless-stopped
+    gpus: all
+    ports:
+      - "127.0.0.1:9400:9400"
+
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    logging: *common-logging
+    container_name: node-exporter
+    restart: unless-stopped
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--collector.disable-defaults'
+      - '--collector.meminfo'
+    expose:
+      - "9100"
+
+  phoenix:
+    image: arizephoenix/phoenix:version-20.26.1
+    logging: *common-logging
+    container_name: phoenix
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6006:6006"
+      - "127.0.0.1:4317:4317"
+    environment:
+      PHOENIX_WORKING_DIR: /data
+    volumes:
+      - phoenix-data:/data
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  phoenix-data:

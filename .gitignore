@@ -1,0 +1,17 @@
+# Environment files anywhere in the repository
+.env
+.env.*
+!.env.example
+
+# Local overrides and secrets
+*.local.yaml
+*.local.yml
+*.local.json
+*.key
+*.pem
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

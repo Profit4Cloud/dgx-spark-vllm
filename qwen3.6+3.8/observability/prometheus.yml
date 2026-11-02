@@ -1,0 +1,22 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: qwen3.6
+    static_configs:
+      - targets:
+          - qwen3.6-35b-a3b:8001
+
+  - job_name: qwen3.8
+    static_configs:
+      - targets:
+          - qwen3.8-27b:8000
+
+  - job_name: dcgm-exporter
+    static_configs:
+      - targets: ['dcgm-exporter:9400']
+
+  - job_name: node-exporter
+    static_configs:
+      - targets: ['node-exporter:9100']
