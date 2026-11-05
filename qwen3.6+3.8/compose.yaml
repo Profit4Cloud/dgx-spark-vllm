@@ -1,3 +1,5 @@
+name: qwen3638
+
 x-logging: &common-logging
   driver: local
   options:
@@ -7,8 +9,11 @@ x-logging: &common-logging
 services:
   qwen3.6-35b-a3b:
     image: vllm/vllm-openai:v0.32.0
+    networks:
+      default:
+        aliases:
+          - qwen3638-35b
     logging: *common-logging
-    container_name: qwen3.6-35b-a3b
     entrypoint:
       - vllm
       - serve
@@ -57,7 +62,7 @@ services:
       retries: 30
       start_period: 300s
     ports:
-      - "127.0.0.1:8001:8001"
+      - "127.0.0.1:${QWEN36_PORT:-8001}:8001"
     restart: unless-stopped
     environment: &common-env
       HF_HOME: /root/.cache/huggingface
@@ -79,8 +84,11 @@ services:
 
   qwen3.8-27b:
     image: vllm/vllm-openai:v0.32.0
+    networks:
+      default:
+        aliases:
+          - qwen3638-27b
     logging: *common-logging
-    container_name: qwen3.8-27b
     entrypoint:
       - vllm
       - serve
@@ -112,7 +120,7 @@ services:
       - '{"method":"mtp","num_speculative_tokens":4}'
       - --language-model-only
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${QWEN38_PORT:-8000}:8000"
     restart: unless-stopped
     depends_on:
       qwen3.6-35b-a3b:
@@ -121,76 +129,8 @@ services:
     volumes: *common-volumes
     ipc: host
     gpus: all
-  prometheus:
-    image: prom/prometheus:v3.7.1
-    logging: *common-logging
-    container_name: prometheus
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.path=/prometheus
-      - --storage.tsdb.retention.time=30d
-    volumes:
-      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus-data:/prometheus
-    ports:
-      - "127.0.0.1:9090:9090"
-    restart: unless-stopped
 
-  grafana:
-    image: grafana/grafana:12.2.0
-    logging: *common-logging
-    container_name: grafana
-    environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD}
-      GF_USERS_ALLOW_SIGN_UP: 'false'
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
-    ports:
-      - "127.0.0.1:3000:3000"
-    depends_on:
-      - prometheus
-    restart: unless-stopped
-
-  dcgm-exporter:
-    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.6.1-4.8.4-distroless
-    logging: *common-logging
-    container_name: dcgm-exporter
-    restart: unless-stopped
-    gpus: all
-    ports:
-      - "127.0.0.1:9400:9400"
-
-  node-exporter:
-    image: prom/node-exporter:v1.12.1
-    logging: *common-logging
-    container_name: node-exporter
-    restart: unless-stopped
-    pid: host
-    volumes:
-      - /proc:/host/proc:ro
-    command:
-      - '--path.procfs=/host/proc'
-      - '--collector.disable-defaults'
-      - '--collector.meminfo'
-    expose:
-      - "9100"
-
-  phoenix:
-    image: arizephoenix/phoenix:version-20.26.1
-    logging: *common-logging
-    container_name: phoenix
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:6006:6006"
-      - "127.0.0.1:4317:4317"
-    environment:
-      PHOENIX_WORKING_DIR: /data
-    volumes:
-      - phoenix-data:/data
-
-volumes:
-  prometheus-data:
-  grafana-data:
-  phoenix-data:
+networks:
+  default:
+    name: dgx-observability
+    external: true
