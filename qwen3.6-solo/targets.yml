@@ -1,0 +1,5 @@
+- targets: ['qwen36-solo-35b:8001']
+  labels:
+    profile: 'qwen3.6-solo'
+    model: 'Qwen3.6-35B-A3B'
+    job: 'qwen3.6'

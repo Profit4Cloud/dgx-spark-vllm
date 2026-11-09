@@ -1,0 +1,11 @@
+- targets: ['qwen3638-35b:8001']
+  labels:
+    profile: 'qwen3.6+3.8'
+    model: 'Qwen3.6-35B-A3B'
+    job: 'qwen3.6'
+
+- targets: ['qwen3638-27b:8000']
+  labels:
+    profile: 'qwen3.6+3.8'
+    model: 'Qwen3.8-27B'
+    job: 'qwen3.8'

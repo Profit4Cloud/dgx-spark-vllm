@@ -15,3 +15,9 @@
 .idea/
 .DS_Store
 Thumbs.db
+
+# Registered targets and copied profile dashboards are runtime state.
+/observability/targets/*
+!/observability/targets/.gitkeep
+/observability/grafana/dashboards/profiles/*
+!/observability/grafana/dashboards/profiles/.gitkeep

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "qwen36/nvidia/Qwen3.6-35B-A3B-NVFP4",
+  "providers": {
+    "qwen36": {
+      "name": "Local Qwen 3.6",
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": {
+        "baseURL": "http://localhost:8001/v1"
+      },
+      "models": {
+        "nvidia/Qwen3.6-35B-A3B-NVFP4": {
+          "name": "Qwen3.6-35B-A3B",
+          "limit": {
+            "context": 32768,
+            "output": 8192
+          }
+        }
+      }
+    }
+  },
+  "plugins": [
+    {
+      "package": "@devtheops/opencode-plugin-otel",
+      "options": {
+        "enabled": true,
+        "endpoint": "http://localhost:6006",
+        "protocol": "http/protobuf",
+        "logsEnabled": false
+      }
+    }
+  ]
+}
